@@ -2,63 +2,202 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ============================================================================
-// 1. PROVIDER - Simple immutable value that doesn't change
-// Use case: Configuration values, constants, or simple computed values
+// NO CODE GENERATION NEEDED - Just pure Riverpod 3.0 API
+// No @riverpod annotations, no build_runner, no .g.dart files
+// ============================================================================
+
+// ============================================================================
+// 1. SIMPLE PROVIDER - Immutable value provider
+// Use case: Configuration values, constants, computed values
 // ============================================================================
 final appThemeProvider = Provider<ThemeData>((ref) {
-  // This provider returns a ThemeData object
-  // It's read-only and doesn't change during app lifecycle
+  // Standard Provider - returns immutable value
   return ThemeData(
     primarySwatch: Colors.blue,
-    //brightness: Brightness.light,
+    brightness: Brightness.light,
   );
 });
 
 // ============================================================================
-// 2. STATE PROVIDER - Simple mutable state (like useState in React)
-// Use case: Simple values that need to change (counters, toggles, etc.)
+// 2. NOTIFIER PROVIDER - Mutable state with methods (Riverpod 3.0 style)
+// Use case: Simple state with business logic
+// This is the new way in Riverpod 3.0 (replaces StateProvider)
 // ============================================================================
-final counterProvider = StateProvider<int>((ref) {
-  // StateProvider is the simplest way to manage mutable state
-  // It automatically exposes a .state property that can be modified
-  return 0; // Initial value
+
+// Step 1: Create the Notifier class
+class Counter extends Notifier<int> {
+  // Notifier<int> means this manages an int state
+
+  @override
+  int build() {
+    // build() returns the initial state
+    return 0;
+  }
+
+  // Methods to modify state
+  void increment() {
+    state++; // state is from Notifier<int>
+  }
+
+  void decrement() {
+    state--;
+  }
+
+  void reset() {
+    state = 0;
+  }
+}
+
+// Step 2: Create the provider
+final counterProvider = NotifierProvider<Counter, int>(() {
+  // NotifierProvider<Counter, int>
+  // Counter = the notifier class
+  // int = the state type
+  return Counter();
 });
 
 // ============================================================================
-// 3. FUTURE PROVIDER - Async data fetching (returns Future)
-// Use case: API calls, database queries, any async operation
+// 3. ASYNC NOTIFIER PROVIDER - For async operations
+// Use case: API calls, async initialization
 // ============================================================================
-final userDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  // FutureProvider automatically handles loading/error/data states
-  // It executes the async function and caches the result
-  await Future.delayed(Duration(seconds: 2)); // Simulating API call
 
-  return {
-    'name': 'John Doe',
-    'email': 'john@example.com',
-    'age': 30,
-  };
+class UserData extends AsyncNotifier<Map<String, dynamic>> {
+  // AsyncNotifier<T> for async state management
+
+  @override
+  Future<Map<String, dynamic>> build() async {
+    // build() returns Future<T> for initial async load
+    await Future.delayed(Duration(seconds: 2));
+
+    return {
+      'name': 'John Doe',
+      'email': 'john@example.com',
+      'age': 30,
+    };
+  }
+
+  // Async method to refresh data
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+
+    await Future.delayed(Duration(seconds: 1));
+
+    state = AsyncValue.data({
+      'name': 'John Doe (Refreshed)',
+      'email': 'john@example.com',
+      'age': 30,
+    });
+  }
+}
+
+final userDataProvider = AsyncNotifierProvider<UserData, Map<String, dynamic>>(() {
+  return UserData();
 });
 
 // ============================================================================
-// 4. STREAM PROVIDER - Continuous stream of data
-// Use case: Real-time data, WebSocket connections, timer updates
+// 4. STREAM PROVIDER - For continuous data streams
+// Use case: Real-time updates, timers, WebSocket data
 // ============================================================================
+
 final timerProvider = StreamProvider<int>((ref) {
-  // StreamProvider listens to a stream and rebuilds UI on each new value
-  // Useful for real-time data updates
+  // StreamProvider automatically handles stream lifecycle
   return Stream.periodic(
     Duration(seconds: 1),
-        (count) => count, // Emits 0, 1, 2, 3... every second
+        (count) => count,
   );
 });
 
 // ============================================================================
-// 5. STATE NOTIFIER PROVIDER - Complex state with business logic
-// Use case: Complex state management with multiple operations
+// 5. FAMILY NOTIFIER - Notifier with parameters
+// Use case: Multiple instances with different arguments
 // ============================================================================
 
-// First, define the state class (immutable)
+class UserById extends Notifier<String> {
+  // We'll receive userId through arg property
+  late int userId;
+
+  @override
+  String build() {
+    // For family providers, parameters come through provider.call()
+    return 'Loading user...';
+  }
+
+  Future<void> loadUser(int id) async {
+    userId = id;
+    state = 'Loading user $id...';
+
+    await Future.delayed(Duration(seconds: 1));
+
+    state = 'User data for ID: $id';
+  }
+}
+
+// Family provider - accepts parameters
+final userByIdProvider = NotifierProvider.family<UserById, String, int>((ref, userId) {
+  final notifier = UserById();
+  notifier.loadUser(userId);
+  return notifier;
+});
+
+// ============================================================================
+// 6. AUTO DISPOSE NOTIFIER - Automatically cleanup when not used
+// Use case: Temporary data, search results, filters
+// ============================================================================
+
+class SearchQuery extends AutoDisposeNotifier<String> {
+  // AutoDisposeNotifier automatically disposes when no longer watched
+
+  @override
+  String build() {
+    // Auto-dispose happens when all listeners are removed
+    return '';
+  }
+
+  void updateQuery(String query) {
+    state = query;
+  }
+
+  void clear() {
+    state = '';
+  }
+}
+
+final searchQueryProvider = AutoDisposeNotifierProvider<SearchQuery, String>(() {
+  return SearchQuery();
+});
+
+// Auto-dispose async notifier for search results
+class SearchResults extends AutoDisposeAsyncNotifier<List<String>> {
+  @override
+  Future<List<String>> build() async {
+    // Watch the search query
+    final query = ref.watch(searchQueryProvider);
+
+    if (query.isEmpty) {
+      return [];
+    }
+
+    // Simulate API call
+    await Future.delayed(Duration(milliseconds: 500));
+
+    return [
+      'Result 1 for $query',
+      'Result 2 for $query',
+      'Result 3 for $query',
+    ];
+  }
+}
+
+final searchResultsProvider = AutoDisposeAsyncNotifierProvider<SearchResults, List<String>>(() {
+  return SearchResults();
+});
+
+// ============================================================================
+// 7. COMPLEX STATE MANAGEMENT - Todo List Example
+// Use case: Managing complex state with multiple operations
+// ============================================================================
+
+// State classes
 class TodoState {
   final List<Todo> todos;
   final bool isLoading;
@@ -70,7 +209,6 @@ class TodoState {
     this.error,
   });
 
-  // Copy method for immutable updates
   TodoState copyWith({
     List<Todo>? todos,
     bool? isLoading,
@@ -104,24 +242,24 @@ class Todo {
   }
 }
 
-// StateNotifier - Contains business logic for state manipulation
-class TodoNotifier extends StateNotifier<TodoState> {
-  TodoNotifier() : super(TodoState(todos: []));
+// Todo Notifier
+class TodoList extends Notifier<TodoState> {
+  @override
+  TodoState build() {
+    return TodoState(todos: []);
+  }
 
-  // Add a new todo
   void addTodo(String title) {
     final newTodo = Todo(
       id: DateTime.now().toString(),
       title: title,
     );
 
-    // StateNotifier requires creating a new state object (immutable pattern)
     state = state.copyWith(
       todos: [...state.todos, newTodo],
     );
   }
 
-  // Toggle todo completion
   void toggleTodo(String id) {
     state = state.copyWith(
       todos: state.todos.map((todo) {
@@ -133,14 +271,12 @@ class TodoNotifier extends StateNotifier<TodoState> {
     );
   }
 
-  // Remove a todo
   void removeTodo(String id) {
     state = state.copyWith(
       todos: state.todos.where((todo) => todo.id != id).toList(),
     );
   }
 
-  // Simulate async operation
   Future<void> loadTodos() async {
     state = state.copyWith(isLoading: true);
 
@@ -149,104 +285,100 @@ class TodoNotifier extends StateNotifier<TodoState> {
     state = state.copyWith(
       isLoading: false,
       todos: [
-        Todo(id: '1', title: 'Learn Riverpod'),
-        Todo(id: '2', title: 'Build an app'),
+        Todo(id: '1', title: 'Learn Riverpod 3.0'),
+        Todo(id: '2', title: 'Build awesome apps'),
       ],
     );
   }
 }
 
-// StateNotifierProvider exposes the StateNotifier
-final todoProvider = StateNotifierProvider<TodoNotifier, TodoState>((ref) {
-  return TodoNotifier();
+final todoListProvider = NotifierProvider<TodoList, TodoState>(() {
+  return TodoList();
 });
 
 // ============================================================================
-// 6. CHANGE NOTIFIER PROVIDER - For ChangeNotifier classes (Flutter legacy)
-// Use case: Migrating from Provider package, using existing ChangeNotifier
+// 8. USER PROFILE - AsyncNotifier with methods
 // ============================================================================
-class CartNotifier extends ChangeNotifier {
-  final List<String> _items = [];
 
-  List<String> get items => List.unmodifiable(_items);
-  int get itemCount => _items.length;
+class UserProfile extends AsyncNotifier<Map<String, dynamic>> {
+  @override
+  Future<Map<String, dynamic>> build() async {
+    await Future.delayed(Duration(seconds: 1));
 
-  void addItem(String item) {
-    _items.add(item);
-    notifyListeners(); // Must manually call notifyListeners()
+    return {
+      'name': 'Alice',
+      'email': 'alice@example.com',
+      'premium': false,
+    };
   }
 
-  void removeItem(String item) {
-    _items.remove(item);
-    notifyListeners();
+  Future<void> updateName(String newName) async {
+    final currentState = state.valueOrNull;
+    if (currentState == null) return;
+
+    state = AsyncValue.data({
+      ...currentState,
+      'name': newName,
+    });
   }
 
-  void clear() {
-    _items.clear();
-    notifyListeners();
+  Future<void> togglePremium() async {
+    state = const AsyncValue.loading();
+
+    await Future.delayed(Duration(milliseconds: 500));
+
+    final currentState = await future;
+    state = AsyncValue.data({
+      ...currentState,
+      'premium': !(currentState['premium'] as bool),
+    });
   }
 }
 
-final cartProvider = ChangeNotifierProvider<CartNotifier>((ref) {
-  return CartNotifier();
+final userProfileProvider = AsyncNotifierProvider<UserProfile, Map<String, dynamic>>(() {
+  return UserProfile();
 });
 
 // ============================================================================
-// 7. FAMILY MODIFIER - Create providers with parameters
-// Use case: Creating multiple instances of a provider with different arguments
+// 9. CART - Simple list state management
 // ============================================================================
-final userByIdProvider = FutureProvider.family<String, int>((ref, userId) async {
-  // .family allows passing parameters to providers
-  // Creates a separate provider instance for each unique parameter
-  await Future.delayed(Duration(seconds: 1));
-  return 'User data for ID: $userId';
+
+class Cart extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    return [];
+  }
+
+  void addItem(String item) {
+    state = [...state, item];
+  }
+
+  void removeItem(String item) {
+    state = state.where((i) => i != item).toList();
+  }
+
+  void clear() {
+    state = [];
+  }
+
+  int get itemCount => state.length;
+}
+
+final cartProvider = NotifierProvider<Cart, List<String>>(() {
+  return Cart();
 });
-
-// ============================================================================
-// 8. AUTO DISPOSE MODIFIER - Automatically dispose when not used
-// Use case: Cleanup resources when widget is removed from tree
-// ============================================================================
-final searchQueryProvider = StateProvider.autoDispose<String>((ref) {
-  // .autoDispose automatically cleans up state when no longer listened to
-  // Useful for search queries, filters, temporary data
-  return '';
-});
-
-final searchResultsProvider = FutureProvider.autoDispose<List<String>>((ref) async {
-  final query = ref.watch(searchQueryProvider);
-
-  // Simulating search API call
-  await Future.delayed(Duration(milliseconds: 500));
-
-  if (query.isEmpty) return [];
-
-  return ['Result 1 for $query', 'Result 2 for $query', 'Result 3 for $query'];
-});
-
-// ============================================================================
-// 9. COMBINING MODIFIERS - Family + AutoDispose
-// ============================================================================
-final productByIdProvider = FutureProvider.autoDispose.family<String, int>(
-      (ref, productId) async {
-    // Combines both modifiers
-    // Creates parameterized provider that auto-disposes
-    await Future.delayed(Duration(seconds: 1));
-    return 'Product details for ID: $productId';
-  },
-);
 
 // ============================================================================
 // 10. COMPUTED PROVIDERS - Derive state from other providers
-// Use case: Calculate values based on other providers
 // ============================================================================
+
 final completedTodosProvider = Provider<List<Todo>>((ref) {
-  // This provider watches another provider and computes a derived value
-  final todoState = ref.watch(todoProvider);
+  final todoState = ref.watch(todoListProvider);
   return todoState.todos.where((todo) => todo.completed).toList();
 });
 
 final todoStatsProvider = Provider<Map<String, int>>((ref) {
-  final todoState = ref.watch(todoProvider);
+  final todoState = ref.watch(todoListProvider);
   final completed = todoState.todos.where((t) => t.completed).length;
   final pending = todoState.todos.length - completed;
 
@@ -258,12 +390,8 @@ final todoStatsProvider = Provider<Map<String, int>>((ref) {
 });
 
 // ============================================================================
-// MAIN APP - Demonstrating all provider types
+// MAIN APP
 // ============================================================================
-
-
-
-//_________________________started ui to be built________________________________
 
 class HomePage extends ConsumerWidget {
   @override
@@ -272,23 +400,23 @@ class HomePage extends ConsumerWidget {
       length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Riverpod 2.0 Examples'),
+          title: Text('Riverpod 3.0 - No Code Generation'),
           bottom: TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'Simple State'),
+              Tab(text: 'Counter'),
               Tab(text: 'Async Data'),
               Tab(text: 'Todo List'),
-              Tab(text: 'Cart'),
+              Tab(text: 'Cart & Profile'),
             ],
           ),
         ),
         body: TabBarView(
           children: [
-            SimpleStateTab(),
+            CounterTab(),
             AsyncDataTab(),
             TodoListTab(),
-            CartTab(),
+            CartAndProfileTab(),
           ],
         ),
       ),
@@ -297,12 +425,12 @@ class HomePage extends ConsumerWidget {
 }
 
 // ============================================================================
-// TAB 1: Simple State (StateProvider)
+// TAB 1: Counter (Notifier)
 // ============================================================================
-class SimpleStateTab extends ConsumerWidget {
+class CounterTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ref.watch() rebuilds widget when provider value changes
+    // Watch the counter state
     final counter = ref.watch(counterProvider);
 
     return Center(
@@ -310,7 +438,7 @@ class SimpleStateTab extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            'StateProvider Example',
+            'Riverpod 3.0 Counter',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 20),
@@ -321,26 +449,65 @@ class SimpleStateTab extends ConsumerWidget {
             children: [
               ElevatedButton(
                 onPressed: () {
-                  // ref.read() - use for one-time reads or calling methods
-                  ref.read(counterProvider.notifier).state++;
+                  // Call methods on the notifier
+                  ref.read(counterProvider.notifier).increment();
                 },
                 child: Text('Increment'),
               ),
               SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
-                  ref.read(counterProvider.notifier).state--;
+                  ref.read(counterProvider.notifier).decrement();
                 },
                 child: Text('Decrement'),
               ),
               SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
-                  ref.read(counterProvider.notifier).state = 0;
+                  ref.read(counterProvider.notifier).reset();
                 },
                 child: Text('Reset'),
               ),
             ],
+          ),
+          SizedBox(height: 40),
+          Divider(),
+          SizedBox(height: 20),
+          Text(
+            'Search with Auto-Dispose',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: TextField(
+              onChanged: (value) {
+                ref.read(searchQueryProvider.notifier).updateQuery(value);
+              },
+              decoration: InputDecoration(
+                hintText: 'Type to search...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          Consumer(
+            builder: (context, ref, child) {
+              final searchResults = ref.watch(searchResultsProvider);
+
+              return searchResults.when(
+                loading: () => CircularProgressIndicator(),
+                error: (err, stack) => Text('Error: $err'),
+                data: (results) {
+                  if (results.isEmpty) {
+                    return Text('Type something to search');
+                  }
+                  return Column(
+                    children: results.map((r) => Text(r)).toList(),
+                  );
+                },
+              );
+            },
           ),
         ],
       ),
@@ -349,12 +516,11 @@ class SimpleStateTab extends ConsumerWidget {
 }
 
 // ============================================================================
-// TAB 2: Async Data (FutureProvider & StreamProvider)
+// TAB 2: Async Data
 // ============================================================================
 class AsyncDataTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // FutureProvider provides AsyncValue<T> with loading/error/data states
     final userData = ref.watch(userDataProvider);
     final timer = ref.watch(timerProvider);
 
@@ -364,13 +530,12 @@ class AsyncDataTab extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'FutureProvider Example',
+            'AsyncNotifier Example',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 10),
-          // AsyncValue provides when() method for pattern matching
           userData.when(
-            loading: () => CircularProgressIndicator(),
+            loading: () => Center(child: CircularProgressIndicator()),
             error: (err, stack) => Text('Error: $err'),
             data: (data) => Card(
               child: Padding(
@@ -381,6 +546,13 @@ class AsyncDataTab extends ConsumerWidget {
                     Text('Name: ${data['name']}'),
                     Text('Email: ${data['email']}'),
                     Text('Age: ${data['age']}'),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(userDataProvider.notifier).refresh();
+                      },
+                      child: Text('Refresh'),
+                    ),
                   ],
                 ),
               ),
@@ -407,7 +579,7 @@ class AsyncDataTab extends ConsumerWidget {
 }
 
 // ============================================================================
-// TAB 3: Todo List (StateNotifierProvider)
+// TAB 3: Todo List
 // ============================================================================
 class TodoListTab extends ConsumerStatefulWidget {
   @override
@@ -420,13 +592,12 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
   @override
   void initState() {
     super.initState();
-    // Load initial todos
-    Future.microtask(() => ref.read(todoProvider.notifier).loadTodos());
+    Future.microtask(() => ref.read(todoListProvider.notifier).loadTodos());
   }
 
   @override
   Widget build(BuildContext context) {
-    final todoState = ref.watch(todoProvider);
+    final todoState = ref.watch(todoListProvider);
     final stats = ref.watch(todoStatsProvider);
 
     return Column(
@@ -450,7 +621,7 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
                   ElevatedButton(
                     onPressed: () {
                       if (_controller.text.isNotEmpty) {
-                        ref.read(todoProvider.notifier).addTodo(_controller.text);
+                        ref.read(todoListProvider.notifier).addTodo(_controller.text);
                         _controller.clear();
                       }
                     },
@@ -460,14 +631,15 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
               ),
               SizedBox(height: 10),
               Card(
+                color: Colors.blue.shade50,
                 child: Padding(
                   padding: EdgeInsets.all(16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      Text('Total: ${stats['total']}'),
-                      Text('Completed: ${stats['completed']}'),
-                      Text('Pending: ${stats['pending']}'),
+                      Text('Total: ${stats['total']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Completed: ${stats['completed']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Pending: ${stats['pending']}', style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -476,10 +648,12 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
           ),
         ),
         if (todoState.isLoading)
-          CircularProgressIndicator()
+          Center(child: CircularProgressIndicator())
         else
           Expanded(
-            child: ListView.builder(
+            child: todoState.todos.isEmpty
+                ? Center(child: Text('No todos yet. Add one above!'))
+                : ListView.builder(
               itemCount: todoState.todos.length,
               itemBuilder: (context, index) {
                 final todo = todoState.todos[index];
@@ -487,7 +661,7 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
                   leading: Checkbox(
                     value: todo.completed,
                     onChanged: (_) {
-                      ref.read(todoProvider.notifier).toggleTodo(todo.id);
+                      ref.read(todoListProvider.notifier).toggleTodo(todo.id);
                     },
                   ),
                   title: Text(
@@ -499,9 +673,9 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
                     ),
                   ),
                   trailing: IconButton(
-                    icon: Icon(Icons.delete),
+                    icon: Icon(Icons.delete, color: Colors.red),
                     onPressed: () {
-                      ref.read(todoProvider.notifier).removeTodo(todo.id);
+                      ref.read(todoListProvider.notifier).removeTodo(todo.id);
                     },
                   ),
                 );
@@ -520,61 +694,106 @@ class _TodoListTabState extends ConsumerState<TodoListTab> {
 }
 
 // ============================================================================
-// TAB 4: Cart (ChangeNotifierProvider)
+// TAB 4: Cart & User Profile
 // ============================================================================
-class CartTab extends ConsumerWidget {
+class CartAndProfileTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
+    final userProfile = ref.watch(userProfileProvider);
 
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Items in cart: ${cart.itemCount}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton(
-                onPressed: cart.itemCount > 0
-                    ? () => ref.read(cartProvider).clear()
-                    : null,
-                child: Text('Clear Cart'),
-              ),
-            ],
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // User Profile Section
+          Text(
+            'User Profile (AsyncNotifier)',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: cart.items.length,
-            itemBuilder: (context, index) {
-              final item = cart.items[index];
-              return ListTile(
-                title: Text(item),
-                trailing: IconButton(
-                  icon: Icon(Icons.remove_circle),
-                  onPressed: () {
-                    ref.read(cartProvider).removeItem(item);
-                  },
+          SizedBox(height: 10),
+          userProfile.when(
+            loading: () => Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Text('Error: $err'),
+            data: (profile) => Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Name: ${profile['name']}', style: TextStyle(fontSize: 16)),
+                    Text('Email: ${profile['email']}', style: TextStyle(fontSize: 16)),
+                    Text('Premium: ${profile['premium']}', style: TextStyle(fontSize: 16)),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(userProfileProvider.notifier).togglePremium();
+                      },
+                      child: Text('Toggle Premium'),
+                    ),
+                  ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        ),
-        Padding(
-          padding: EdgeInsets.all(16),
-          child: ElevatedButton(
-            onPressed: () {
-              final item = 'Item ${cart.itemCount + 1}';
-              ref.read(cartProvider).addItem(item);
-            },
-            child: Text('Add Item to Cart'),
+          SizedBox(height: 30),
+
+          // Cart Section
+          Text(
+            'Shopping Cart',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-        ),
-      ],
+          SizedBox(height: 10),
+          Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Items: ${cart.length}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ElevatedButton(
+                        onPressed: cart.isNotEmpty
+                            ? () => ref.read(cartProvider.notifier).clear()
+                            : null,
+                        child: Text('Clear Cart'),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  if (cart.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('Cart is empty'),
+                    )
+                  else
+                    ...cart.map((item) => ListTile(
+                      leading: Icon(Icons.shopping_bag),
+                      title: Text(item),
+                      trailing: IconButton(
+                        icon: Icon(Icons.remove_circle, color: Colors.red),
+                        onPressed: () {
+                          ref.read(cartProvider.notifier).removeItem(item);
+                        },
+                      ),
+                    )),
+                  SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final item = 'Item ${cart.length + 1}';
+                      ref.read(cartProvider.notifier).addItem(item);
+                    },
+                    icon: Icon(Icons.add),
+                    label: Text('Add Item to Cart'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

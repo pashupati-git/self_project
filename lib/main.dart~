@@ -1,46 +1,747 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:login/screens/home_page.dart';
+// ============================================================================
+// RIVERPOD 3.0 WITHOUT CODE GENERATION - FIXED VERSION
+// Compatible with flutter_riverpod: ^3.1.0
+// ============================================================================
 
+// ============================================================================
+// 1. SIMPLE PROVIDER - Immutable value provider
+// ============================================================================
+final appThemeProvider = Provider<ThemeData>((ref) {
+  return ThemeData(
+    primarySwatch: Colors.blue,
+    brightness: Brightness.light,
+  );
+});
 
+// ============================================================================
+// 2. NOTIFIER PROVIDER - Mutable state (Riverpod 3.0 style)
+// ============================================================================
 
+class Counter extends Notifier<int> {
+  @override
+  int build() {
+    return 0;
+  }
+
+  void increment() {
+    state++;
+  }
+
+  void decrement() {
+    state--;
+  }
+
+  void reset() {
+    state = 0;
+  }
+}
+
+final counterProvider = NotifierProvider<Counter, int>(Counter.new);
+
+// ============================================================================
+// 3. ASYNC NOTIFIER PROVIDER - For async operations
+// ============================================================================
+
+class UserData extends AsyncNotifier<Map<String, dynamic>> {
+  @override
+  Future<Map<String, dynamic>> build() async {
+    await Future.delayed(Duration(seconds: 2));
+
+    return {
+      'name': 'John Doe',
+      'email': 'john@example.com',
+      'age': 30,
+    };
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+
+    await Future.delayed(Duration(seconds: 1));
+
+    state = AsyncValue.data({
+      'name': 'John Doe (Refreshed)',
+      'email': 'john@example.com',
+      'age': 30,
+    });
+  }
+}
+
+final userDataProvider = AsyncNotifierProvider<UserData, Map<String, dynamic>>(UserData.new);
+
+// ============================================================================
+// 4. STREAM PROVIDER - For continuous data streams
+// ============================================================================
+
+final timerProvider = StreamProvider<int>((ref) {
+  return Stream.periodic(
+    Duration(seconds: 1),
+        (count) => count,
+  );
+});
+
+// ============================================================================
+// 5. FAMILY NOTIFIER - Fixed version without AutoDispose
+// ============================================================================
+
+class UserById extends FamilyNotifier<String, int> {
+  @override
+  String build(int userId) {
+    // In family notifiers, the parameter comes through build()
+    _loadUser(userId);
+    return 'Loading user $userId...';
+  }
+
+  Future<void> _loadUser(int id) async {
+    await Future.delayed(Duration(seconds: 1));
+    state = 'User data for ID: $id';
+  }
+}
+
+final userByIdProvider = NotifierProvider.family<UserById, String, int>(UserById.new);
+
+// ============================================================================
+// 6. SIMPLE STATE PROVIDER - For search query (replaces AutoDisposeNotifier)
+// ============================================================================
+
+final searchQueryProvider = StateProvider<String>((ref) {
+  return '';
+});
+
+// Search results provider that depends on search query
+final searchResultsProvider = FutureProvider<List<String>>((ref) async {
+  final query = ref.watch(searchQueryProvider);
+
+  if (query.isEmpty) {
+    return [];
+  }
+
+  // Simulate API call
+  await Future.delayed(Duration(milliseconds: 500));
+
+  return [
+    'Result 1 for $query',
+    'Result 2 for $query',
+    'Result 3 for $query',
+  ];
+});
+
+// ============================================================================
+// 7. COMPLEX STATE MANAGEMENT - Todo List
+// ============================================================================
+
+class TodoState {
+  final List<Todo> todos;
+  final bool isLoading;
+  final String? error;
+
+  TodoState({
+    required this.todos,
+    this.isLoading = false,
+    this.error,
+  });
+
+  TodoState copyWith({
+    List<Todo>? todos,
+    bool? isLoading,
+    String? error,
+  }) {
+    return TodoState(
+      todos: todos ?? this.todos,
+      isLoading: isLoading ?? this.isLoading,
+      error: error ?? this.error,
+    );
+  }
+}
+
+class Todo {
+  final String id;
+  final String title;
+  final bool completed;
+
+  Todo({
+    required this.id,
+    required this.title,
+    this.completed = false,
+  });
+
+  Todo copyWith({String? title, bool? completed}) {
+    return Todo(
+      id: id,
+      title: title ?? this.title,
+      completed: completed ?? this.completed,
+    );
+  }
+}
+
+class TodoList extends Notifier<TodoState> {
+  @override
+  TodoState build() {
+    return TodoState(todos: []);
+  }
+
+  void addTodo(String title) {
+    final newTodo = Todo(
+      id: DateTime.now().toString(),
+      title: title,
+    );
+
+    state = state.copyWith(
+      todos: [...state.todos, newTodo],
+    );
+  }
+
+  void toggleTodo(String id) {
+    state = state.copyWith(
+      todos: state.todos.map((todo) {
+        if (todo.id == id) {
+          return todo.copyWith(completed: !todo.completed);
+        }
+        return todo;
+      }).toList(),
+    );
+  }
+
+  void removeTodo(String id) {
+    state = state.copyWith(
+      todos: state.todos.where((todo) => todo.id != id).toList(),
+    );
+  }
+
+  Future<void> loadTodos() async {
+    state = state.copyWith(isLoading: true);
+
+    await Future.delayed(Duration(seconds: 1));
+
+    state = state.copyWith(
+      isLoading: false,
+      todos: [
+        Todo(id: '1', title: 'Learn Riverpod 3.0'),
+        Todo(id: '2', title: 'Build awesome apps'),
+      ],
+    );
+  }
+}
+
+final todoListProvider = NotifierProvider<TodoList, TodoState>(TodoList.new);
+
+// ============================================================================
+// 8. USER PROFILE - AsyncNotifier with methods
+// ============================================================================
+
+class UserProfile extends AsyncNotifier<Map<String, dynamic>> {
+  @override
+  Future<Map<String, dynamic>> build() async {
+    await Future.delayed(Duration(seconds: 1));
+
+    return {
+      'name': 'Alice',
+      'email': 'alice@example.com',
+      'premium': false,
+    };
+  }
+
+  Future<void> updateName(String newName) async {
+    // Use value instead of valueOrNull for Riverpod 3.1.0
+    final currentState = state.value;
+    if (currentState == null) return;
+
+    state = AsyncValue.data({
+      ...currentState,
+      'name': newName,
+    });
+  }
+
+  Future<void> togglePremium() async {
+    state = const AsyncValue.loading();
+
+    await Future.delayed(Duration(milliseconds: 500));
+
+    final currentState = await future;
+    state = AsyncValue.data({
+      ...currentState,
+      'premium': !(currentState['premium'] as bool),
+    });
+  }
+}
+
+final userProfileProvider = AsyncNotifierProvider<UserProfile, Map<String, dynamic>>(UserProfile.new);
+
+// ============================================================================
+// 9. CART - Simple list state management
+// ============================================================================
+
+class Cart extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    return [];
+  }
+
+  void addItem(String item) {
+    state = [...state, item];
+  }
+
+  void removeItem(String item) {
+    state = state.where((i) => i != item).toList();
+  }
+
+  void clear() {
+    state = [];
+  }
+
+  int get itemCount => state.length;
+}
+
+final cartProvider = NotifierProvider<Cart, List<String>>(Cart.new);
+
+// ============================================================================
+// 10. COMPUTED PROVIDERS - Derive state from other providers
+// ============================================================================
+
+final completedTodosProvider = Provider<List<Todo>>((ref) {
+  final todoState = ref.watch(todoListProvider);
+  return todoState.todos.where((todo) => todo.completed).toList();
+});
+
+final todoStatsProvider = Provider<Map<String, int>>((ref) {
+  final todoState = ref.watch(todoListProvider);
+  final completed = todoState.todos.where((t) => t.completed).length;
+  final pending = todoState.todos.length - completed;
+
+  return {
+    'total': todoState.todos.length,
+    'completed': completed,
+    'pending': pending,
+  };
+});
+
+// ============================================================================
+// MAIN APP
+// ============================================================================
 
 void main() {
   runApp(
-    // ProviderScope is required at the root to enable Riverpod
     ProviderScope(
       child: MyApp(),
     ),
   );
 }
 
-// class MyApp extends ConsumerWidget {
-//   @override
-//   Widget build(BuildContext context, WidgetRef ref) {
-//     // Using Provider to get theme
-//     final theme = ref.watch(appThemeProvider);
-//
-//     return MaterialApp(
-//       title: 'Riverpod 2.0 Demo',
-//       theme: theme,
-//       home: HomePage(),
-//     );
-//   }
-// }
-
 class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-
     final theme = ref.watch(appThemeProvider);
-    return MaterialApp(
-      title: 'Riverpod 2.0 Demo',
-      theme: theme,
-      home:HomePage(),
 
+    return MaterialApp(
+      title: 'Riverpod 3.0 No CodeGen',
+      theme: theme,
+      home: HomePage(),
+    );
+  }
+}
+
+class HomePage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Riverpod 3.0 - No Code Generation'),
+          bottom: TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Counter'),
+              Tab(text: 'Async Data'),
+              Tab(text: 'Todo List'),
+              Tab(text: 'Cart & Profile'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            CounterTab(),
+            AsyncDataTab(),
+            TodoListTab(),
+            CartAndProfileTab(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// TAB 1: Counter
+// ============================================================================
+class CounterTab extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final counter = ref.watch(counterProvider);
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Riverpod 3.0 Counter',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 20),
+          Text('Counter: $counter', style: TextStyle(fontSize: 32)),
+          SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  ref.read(counterProvider.notifier).increment();
+                },
+                child: Text('Increment'),
+              ),
+              SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: () {
+                  ref.read(counterProvider.notifier).decrement();
+                },
+                child: Text('Decrement'),
+              ),
+              SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: () {
+                  ref.read(counterProvider.notifier).reset();
+                },
+                child: Text('Reset'),
+              ),
+            ],
+          ),
+          SizedBox(height: 40),
+          Divider(),
+          SizedBox(height: 20),
+          Text(
+            'Search Example',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: TextField(
+              onChanged: (value) {
+                ref.read(searchQueryProvider.notifier).state = value;
+              },
+              decoration: InputDecoration(
+                hintText: 'Type to search...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          Consumer(
+            builder: (context, ref, child) {
+              final searchResults = ref.watch(searchResultsProvider);
+
+              return searchResults.when(
+                loading: () => CircularProgressIndicator(),
+                error: (err, stack) => Text('Error: $err'),
+                data: (results) {
+                  if (results.isEmpty) {
+                    return Text('Type something to search');
+                  }
+                  return Column(
+                    children: results.map((r) => Text(r)).toList(),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// TAB 2: Async Data
+// ============================================================================
+class AsyncDataTab extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userData = ref.watch(userDataProvider);
+    final timer = ref.watch(timerProvider);
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'AsyncNotifier Example',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          userData.when(
+            loading: () => Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Text('Error: $err'),
+            data: (data) => Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Name: ${data['name']}'),
+                    Text('Email: ${data['email']}'),
+                    Text('Age: ${data['age']}'),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(userDataProvider.notifier).refresh();
+                      },
+                      child: Text('Refresh'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 30),
+          Text(
+            'StreamProvider Example',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          timer.when(
+            loading: () => Text('Waiting for timer...'),
+            error: (err, stack) => Text('Error: $err'),
+            data: (count) => Text(
+              'Timer: $count seconds',
+              style: TextStyle(fontSize: 24),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// TAB 3: Todo List
+// ============================================================================
+class TodoListTab extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<TodoListTab> createState() => _TodoListTabState();
+}
+
+class _TodoListTabState extends ConsumerState<TodoListTab> {
+  final _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(todoListProvider.notifier).loadTodos());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final todoState = ref.watch(todoListProvider);
+    final stats = ref.watch(todoStatsProvider);
+
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        hintText: 'Enter todo title',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_controller.text.isNotEmpty) {
+                        ref.read(todoListProvider.notifier).addTodo(_controller.text);
+                        _controller.clear();
+                      }
+                    },
+                    child: Text('Add'),
+                  ),
+                ],
+              ),
+              SizedBox(height: 10),
+              Card(
+                color: Colors.blue.shade50,
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Text('Total: ${stats['total']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Completed: ${stats['completed']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Pending: ${stats['pending']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (todoState.isLoading)
+          Center(child: CircularProgressIndicator())
+        else
+          Expanded(
+            child: todoState.todos.isEmpty
+                ? Center(child: Text('No todos yet. Add one above!'))
+                : ListView.builder(
+              itemCount: todoState.todos.length,
+              itemBuilder: (context, index) {
+                final todo = todoState.todos[index];
+                return ListTile(
+                  leading: Checkbox(
+                    value: todo.completed,
+                    onChanged: (_) {
+                      ref.read(todoListProvider.notifier).toggleTodo(todo.id);
+                    },
+                  ),
+                  title: Text(
+                    todo.title,
+                    style: TextStyle(
+                      decoration: todo.completed
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () {
+                      ref.read(todoListProvider.notifier).removeTodo(todo.id);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+}
+
+// ============================================================================
+// TAB 4: Cart & User Profile
+// ============================================================================
+class CartAndProfileTab extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    final userProfile = ref.watch(userProfileProvider);
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // User Profile Section
+          Text(
+            'User Profile (AsyncNotifier)',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          userProfile.when(
+            loading: () => Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Text('Error: $err'),
+            data: (profile) => Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Name: ${profile['name']}', style: TextStyle(fontSize: 16)),
+                    Text('Email: ${profile['email']}', style: TextStyle(fontSize: 16)),
+                    Text('Premium: ${profile['premium']}', style: TextStyle(fontSize: 16)),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(userProfileProvider.notifier).togglePremium();
+                      },
+                      child: Text('Toggle Premium'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 30),
+
+          // Cart Section
+          Text(
+            'Shopping Cart',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Items: ${cart.length}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ElevatedButton(
+                        onPressed: cart.isNotEmpty
+                            ? () => ref.read(cartProvider.notifier).clear()
+                            : null,
+                        child: Text('Clear Cart'),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  if (cart.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('Cart is empty'),
+                    )
+                  else
+                    ...cart.map((item) => ListTile(
+                      leading: Icon(Icons.shopping_bag),
+                      title: Text(item),
+                      trailing: IconButton(
+                        icon: Icon(Icons.remove_circle, color: Colors.red),
+                        onPressed: () {
+                          ref.read(cartProvider.notifier).removeItem(item);
+                        },
+                      ),
+                    )),
+                  SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final item = 'Item ${cart.length + 1}';
+                      ref.read(cartProvider.notifier).addItem(item);
+                    },
+                    icon: Icon(Icons.add),
+                    label: Text('Add Item to Cart'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
