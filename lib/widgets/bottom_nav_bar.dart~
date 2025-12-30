@@ -1,0 +1,106 @@
+// GNav(
+// rippleColor: Colors.grey[800], // tab button ripple color when pressed
+// hoverColor: Colors.grey[700], // tab button hover color
+// haptic: true, // haptic feedback
+// tabBorderRadius: 15,
+// tabActiveBorder: Border.all(color: Colors.black, width: 1), // tab button border
+// tabBorder: Border.all(color: Colors.grey, width: 1), // tab button border
+// tabShadow: [BoxShadow(color: Colors.grey.withOpacity(0.5), blurRadius: 8)], // tab button shadow
+// curve: Curves.easeOutExpo, // tab animation curves
+// duration: Duration(milliseconds: 900), // tab animation duration
+// gap: 8, // the tab button gap between icon and text
+// color: Colors.grey[800], // unselected icon color
+// activeColor: Colors.purple, // selected icon and text color
+// iconSize: 24, // tab button icon size
+// tabBackgroundColor: Colors.purple.withOpacity(0.1), // selected tab background color
+// padding: EdgeInsets.symmetric(horizontal: 20, vertical: 5), // navigation bar padding
+// tabs: [
+// GButton(
+// icon: LineIcons.home,
+// text: 'Home',
+// ),
+// GButton(
+// icon: LineIcons.heart_o,
+// text: 'Likes',
+// ),
+// GButton(
+// icon: LineIcons.search,
+// text: 'Search',
+// ),
+// GButton(
+// icon: LineIcons.user,
+// text: 'Profile',
+// )
+// ]
+// )
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:google_nav_bar/google_nav_bar.dart';
+import 'package:line_icons/line_icons.dart';
+
+class BottomNavBar extends StatefulWidget {
+  final int SelectedItem;
+  final Function(int) onTap;
+
+  const BottomNavBar({
+    super.key,
+     required this.SelectedItem,
+     required this.onTap,
+  });
+
+  @override
+  State<BottomNavBar> createState() => _BottomNavBarState();
+}
+
+class _BottomNavBarState extends State<BottomNavBar> {
+  @override
+  Widget build(BuildContext context) {
+    return  Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(50),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: GNav(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          gap: 6,
+          iconSize: 24,
+          textSize: 14,
+          tabBorderRadius: 50,
+          backgroundColor: Colors.transparent,
+          activeColor: Colors.white,
+          color: Colors.white60,
+          tabBackgroundGradient: LinearGradient(
+            colors: [
+              Colors.deepOrange[400]!,
+              Colors.deepOrangeAccent.shade700,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          tabs: [
+            const GButton(icon: CupertinoIcons.home, text: 'Home'),
+            const GButton(icon: CupertinoIcons.app_fill, text: 'All'),
+            const GButton(icon: CupertinoIcons.heart_circle, text: 'Fav'),
+            const GButton(icon: CupertinoIcons.cart_fill, text: 'Cart'),
+
+          ],
+          selectedIndex: selectedItem,
+          onTabChange: onTap,
+
+        ),
+      ),
+    );
+  }
+}
