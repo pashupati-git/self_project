@@ -1,35 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:login/permission/permission_home.dart';
-import 'package:login/screens/auth_toggle.dart';
-import 'package:login/screens/home.dart';
-import 'package:login/screens/home2.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:login/screens/home_page.dart';
 
 
-import 'package:login/screens/homepage.dart';
-import 'package:login/screens/login.dart';
-import 'package:login/screens/signup.dart';
+
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    // ProviderScope is required at the root to enable Riverpod
+    ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+// class MyApp extends ConsumerWidget {
+//   @override
+//   Widget build(BuildContext context, WidgetRef ref) {
+//     // Using Provider to get theme
+//     final theme = ref.watch(appThemeProvider);
+//
+//     return MaterialApp(
+//       title: 'Riverpod 2.0 Demo',
+//       theme: theme,
+//       home: HomePage(),
+//     );
+//   }
+// }
+
+class MyApp extends ConsumerWidget {
+  const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+
+    final theme = ref.watch(appThemeProvider);
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      debugShowCheckedModeBanner: false,
-      home: Home(),
-     // home: Example(),      //example direct imported from bottm nav bar example(pub.dev)
-      //home:AuthToggle(),
-      //home:AuthToggle(),
-      //home:HomePage(),
-      //home:PermissionHome(),
+      title: 'Riverpod 2.0 Demo',
+      theme: theme,
+      home:HomePage(),
+
     );
   }
 }
+
