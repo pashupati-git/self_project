@@ -39,7 +39,10 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   google_nav_bar: ^5.0.7
   line_icons: ^2.0.3
-  flutter_riverpod: ^2.5.1
+  flutter_riverpod: ^2.4.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  http: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -51,6 +54,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  # If you want to use code generation later (for Riverpod 3.0 migration)
+  # riverpod_generator: ^2.4.0
+  # build_runner: ^2.4.0
+  # riverpod_annotation: ^2.3.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
