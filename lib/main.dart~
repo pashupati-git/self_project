@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:login/services/hive_services.dart';
 import 'package:login/views/screens/todo_list_screen.dart';
 
-void main() async {
+void main() async{
   WidgetsFlutterBinding.ensureInitialized();
-
-  //initialization: Setup hive local db before app starts
-  //await HiveService().init();
-  final hive=HiveService();
-  await hive.init();
   runApp(const ProviderScope(child: MyApp()));
 }
 

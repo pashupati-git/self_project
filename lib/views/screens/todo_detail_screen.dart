@@ -1,0 +1,30 @@
+import 'package:flutter/material.dart';
+
+import '../../models/todo_model.dart';
+
+
+class TodoDetailScreen extends StatelessWidget {
+  final Todo todo;
+  const TodoDetailScreen({super.key,required this.todo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title:const Text('Task Details')),
+      body: Padding(padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(todo.title,style:const TextStyle(fontSize: 28,fontWeight:FontWeight.bold),),
+          const SizedBox(height:10),
+          Text('Status:${todo.isCompleted?'COMPLETED':'PENDING'}',
+          style:TextStyle(color:todo.isCompleted? Colors.green:Colors.red,fontWeight:FontWeight.bold)
+          ),
+          const Divider(height:30),
+          const Text('Description:',style:TextStyle(color:Colors.grey)),
+          Text(todo.subtitle,style:const TextStyle(fontSize:18)),
+        ],
+      ),),
+    );
+  }
+}

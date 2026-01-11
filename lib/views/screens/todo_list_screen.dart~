@@ -1,0 +1,132 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:login/views/screens/todo_detail_screen.dart';
+import 'package:login/views/widgets/responsive_layout.dart';
+
+import '../../provider/todo_provider.dart';
+
+class TodoListScreen extends ConsumerStatefulWidget {
+  const TodoListScreen({super.key});
+
+  @override
+  ConsumerState<TodoListScreen> createState() => _TodoListScreenState();
+}
+
+class _TodoListScreenState extends ConsumerState<TodoListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(todoProvider.notifier).fetchTodos());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final todos = ref.watch(todoProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text('MVVM todo Hive')),
+      body: ResponsiveLayout(
+        mobile: _buildListView(todos, 1),
+        desktop: _buildListView(todos, 3),
+      ),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _openEditor(context),
+        child: const Icon(Icons.add),),
+    );
+  }
+
+
+  Widget _buildListView(List todos, int gridCount) {
+    if (todos.isEmpty) return const Center(child: CircularProgressIndicator());
+    return GridView.builder(
+      padding: const EdgeInsets.all(10),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: gridCount,
+        childAspectRatio: 3,
+      ),
+      itemCount: todos.length,
+      itemBuilder: (contex, index) {
+        final todo = todos[index];
+        return Card(
+          color: todo.isCompleted ? Colors.green[50] : Colors.orange[50],
+          child: ListTile(
+            onTap: () =>
+                Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => TodoDetailScreen(todo: todo))),
+            title: Text(
+              todo.title,
+              style: TextStyle(
+                decoration: todo.isCompleted
+                    ? TextDecoration.lineThrough
+                    : null,
+              ),
+            ),
+            subtitle: Text(
+              'Status:${todo.isCompleted ? 'Completed' : 'Pending'}\n ${todo
+                  .subtitle}',
+            ),
+            leading: Checkbox(
+              value: todo.isCompleted,
+              onChanged: (_) =>
+                  ref.read(todoProvider.notifier).toggleStatus(todo.id),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _openEditor(context, todo: todo),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () =>
+                      ref.read(todoProvider.notifier).removeTodo(todo.id),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openEditor(BuildContext context, {dynamic todo}) {
+    final titleCtrl = TextEditingController(text: todo?.title);
+    final subCtrl = TextEditingController(text: todo?.subtitle);
+    showDialog(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            title: Text(todo == null ? "Add Todo" : "Edit Todo"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: "Title"),
+                ),
+                TextField(
+                  controller: subCtrl,
+                  decoration: const InputDecoration(labelText: "Subtitle"),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  ref
+                      .read(todoProvider.notifier)
+                      .upsertTodo(
+                    id: todo?.id,
+                    title: titleCtrl.text,
+                    subtitle: subCtrl.text,
+                  );
+                  Navigator.pop(context);
+                },
+                child: const Text("Save"),
+              ),
+            ],
+          ),
+    );
+  }
+}

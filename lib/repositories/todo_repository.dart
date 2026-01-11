@@ -1,186 +1,27 @@
-// lib/repositories/todo_repository.dart (FIXED VERSION)
+import '../models/todo_model.dart';
+import '../services/api_service.dart';
+import '../services/hive_services.dart';
 
-import '../data/local/hive_service.dart';
-import '../data/remote/api_service.dart';
-import '../model/todo_model.dart';
+class TodoRepository{
+  final ApiService _api;
+  final HiveService _hive;
 
+  TodoRepository(this._api, this._hive);
 
-/// REPOSITORY LAYER - TodoRepository (FIXED)
-///
-/// Business Logic: Data management and synchronization
-///
-/// FIXES:
-/// 1. Initialize Hive BEFORE any operations (was missing proper init flow)
-/// 2. Don't clear local data on refresh (preserve user's todos)
-/// 3. Merge API data with local data instead of replacing
-/// 4. Handle initialization properly on app restart
-class TodoRepository {
-  final HiveService _hiveService;
-  final ApiService _apiService;
-  bool _isInitialized = false;
-
-  TodoRepository({
-    required HiveService hiveService,
-    required ApiService apiService,
-  })  : _hiveService = hiveService,
-        _apiService = apiService;
-
-  /// BUSINESS LOGIC: Initialize repository
-  ///
-  /// CRITICAL: Must be called before any operations
-  /// This ensures Hive is ready when app restarts
-  Future<void> initialize() async {
-    if (_isInitialized) return;
-
-    await _hiveService.init();
-    _isInitialized = true;
-  }
-
-  /// BUSINESS LOGIC: Get all todos with offline-first strategy
-  ///
-  /// Strategy:
-  /// 1. First check local storage (fast, works offline)
-  /// 2. If empty AND online, fetch from API and cache
-  /// 3. Return cached data for offline access
-  ///
-  /// FIX: This now properly loads saved todos on app restart
-  Future<List<TodoModel>> getAllTodos() async {
-    // Ensure Hive is initialized
-    await initialize();
-
-    // Try to get from local storage first (offline-first)
-    final localTodos = _hiveService.getAllTodos();
-
-    // If we have local data, return it immediately
-    if (localTodos.isNotEmpty) {
-      return localTodos;
-    }
-
-    // Only fetch from API if local storage is empty
-    // This happens on first app launch
-    try {
-      final remoteTodos = await _apiService.fetchTodos();
-
-      // Cache the fetched todos locally
-      await _hiveService.saveAllTodos(remoteTodos);
-
-      return remoteTodos;
-    } catch (e) {
-      // If API fails, return empty list (app still works offline)
-      return [];
-    }
-  }
-
-  /// BUSINESS LOGIC: Refresh todos from API
-  ///
-  /// FIX: Now merges API data with local data instead of replacing
-  ///
-  /// Strategy:
-  /// - Fetch from API
-  /// - Merge with locally created todos
-  /// - Preserve user's custom todos
-  /// - Update API todos if they changed
-  Future<List<TodoModel>> refreshTodos() async {
-    try {
-      final remoteTodos = await _apiService.fetchTodos();
-      final localTodos = _hiveService.getAllTodos();
-
-      // FIX: Merge logic instead of clearing everything
-      // Keep locally created todos, update API todos
-      final mergedTodos = <String, TodoModel>{};
-
-      // Add all local todos first
-      for (var todo in localTodos) {
-        mergedTodos[todo.id] = todo;
-      }
-
-      // Update/add API todos (only if they're from API - id <= 10)
-      for (var todo in remoteTodos) {
-        final todoId = int.tryParse(todo.id);
-        if (todoId != null && todoId <= 10) {
-          // This is an API todo, update it
-          mergedTodos[todo.id] = todo;
-        }
-      }
-
-      // Save merged data
-      final finalTodos = mergedTodos.values.toList();
-      await _hiveService.clearAllTodos();
-      await _hiveService.saveAllTodos(finalTodos);
-
-      return finalTodos;
-    } catch (e) {
-      // If refresh fails, return current local data
-      return _hiveService.getAllTodos();
-    }
-  }
-
-  /// BUSINESS LOGIC: Add new todo
-  ///
-  /// Optimistic Update Strategy:
-  /// 1. Save locally first (instant UI update)
-  /// 2. Try to sync with API in background
-  /// 3. Even if API fails, local data is persisted
-  Future<void> addTodo(TodoModel todo) async {
-    // Ensure initialized
-    await initialize();
-
-    // Save to local storage immediately (optimistic update)
-    await _hiveService.saveTodo(todo);
-
-    // Try to sync with API (optional, non-blocking)
-    try {
-      await _apiService.createTodo(todo);
-    } catch (e) {
-      // API sync failed, but local save succeeded
-      // App continues to work offline
-    }
-  }
-
-  /// BUSINESS LOGIC: Update existing todo
-  Future<void> updateTodo(TodoModel todo) async {
-    await initialize();
-
-    // Update local storage immediately
-    await _hiveService.updateTodo(todo);
-
-    // Try to sync with API
-    try {
-      await _apiService.updateTodo(todo);
-    } catch (e) {
-      // Continue even if API sync fails
-    }
-  }
-
-  /// BUSINESS LOGIC: Delete todo
-  Future<void> deleteTodo(String id) async {
-    await initialize();
-
-    // Delete from local storage immediately
-    await _hiveService.deleteTodo(id);
-
-    // Try to sync with API
-    try {
-      await _apiService.deleteTodo(id);
-    } catch (e) {
-      // Continue even if API sync fails
-    }
-  }
-
-  /// BUSINESS LOGIC: Clear completed todos
-  Future<void> clearCompleted() async {
-    await initialize();
-
-    final allTodos = _hiveService.getAllTodos();
-    final completedTodos = allTodos.where((todo) => todo.isCompleted);
-
-    for (var todo in completedTodos) {
-      await deleteTodo(todo.id);
-    }
-  }
-
-  /// Get local todo count (for quick stats)
-  int getTodoCount() {
-    return _hiveService.getTodoCount();
-  }
+  //business logic:Synchronization Strategy
+  //If Hive is empty, fetch from API and cache locally
+  //this ensures the app works offline after the first sync
+   Future<List<Todo>> getTodos() async {
+     final box=_hive.getTodoBox();
+     if(box.isEmpty){
+       final remoteTodos=await _api.fetchRemoteTodos();
+       for(var todo in remoteTodos){
+         await box.put(todo.id,todo);
+       }
+     }
+   return box.values.toList();
+   }
+   //crud business logic:Direct Hive operations
+   Future<void> saveTodo(Todo todo)async=> await _hive.getTodoBox().put(todo.id, todo);
+   Future<void> deleteTodo(String id)async=> await _hive.getTodoBox().delete(id);
 }

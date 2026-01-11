@@ -1,0 +1,70 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/todo_model.dart';
+import '../repositories/todo_repository.dart';
+import '../services/api_service.dart';
+import '../services/hive_services.dart';
+
+//Dependency Provider  //single instance ,singleton like behaviour//
+final todoRepositoryProvider = Provider(
+  (ref) => TodoRepository(ApiService(), HiveService()),
+);
+
+//The main Notifier
+final todoProvider = NotifierProvider<TodoNotifier, List<Todo>>(
+  TodoNotifier.new,
+);
+
+class TodoNotifier extends Notifier<List<Todo>> {
+  @override
+  List<Todo> build() => [];
+
+  //Business logic:Initial load from repository
+  Future<void> fetchTodos() async {
+    state = await ref.read(todoRepositoryProvider).getTodos();
+  }
+
+  //Business logic:Add or Edit logic
+  void upsertTodo({
+    String? id,
+    required String title,
+    required String subtitle,
+  }) async {
+    final repo = ref.read(todoRepositoryProvider);
+    if (id == null) {
+      //Create New
+      final newTodo = Todo(
+        id: const Uuid().v4(),
+        title: title,
+        subtitle: subtitle,
+      );
+      state=[...state,newTodo];
+      await repo.saveTodo(newTodo);
+    } else {
+      //Edit Existing
+      state = [
+        for (final t in state)
+          if (t.id == id) t.copyWith(title: title, subtitle: subtitle) else t,
+      ];
+      final updated = state.firstWhere((t) => t.id == id);
+      await repo.saveTodo(updated);
+    }
+  }
+
+  //business logic:Status Management(completed/pending)
+  void toggleStatus(String id) async {
+    state = [
+      for (final t in state)
+        if (t.id == id) t.copyWith(isCompleted: !t.isCompleted) else t,
+    ];
+    await ref
+        .read(todoRepositoryProvider)
+        .saveTodo(state.firstWhere((t) => t.id == id));
+  }
+
+  void removeTodo(String id) async {
+    state = state.where((t) => t.id != id).toList();
+    await ref.read(todoRepositoryProvider).deleteTodo(id);
+  }
+}
